@@ -1,0 +1,308 @@
+---
+title: "Assignment 5"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Q.2
+### 2. For parts (a) through (c), indicate which of i. through iv. is correct. Justify your answer.
+
+#### (a) The lasso, relative to least squares, is:
+i. More flexible and hence will give improved prediction accuracy when its increase in bias is less than its decrease in variance.
+ii. More flexible and hence will give improved prediction accuracy when its increase in variance is less than its decrease in bias.
+iii. Less flexible and hence will give improved prediction accuracy when its increase in bias is less than its decrease in variance.
+iv. Less flexible and hence will give improved prediction accuracy when its increase in variance is less than its decrease in bias.
+
+The correct answer is: 
+iii. Less flexible and hence will give improved prediction accuracy when its increase in bias is less than its decrease in variance. 
+
+#### (b) Repeat (a) for ridge regression relative to least squares.
+The correct answer is: 
+iii. Less flexible and hence will give improved prediction accuracy when its increase in bias is less than its decrease in variance. 
+
+#### (c) Repeat (a) for non-linear methods relative to least squares.
+The correct answer is: 
+ii. More flexible and hence will give improved prediction accuracy when its increase in variance is less than its decrease in bias.
+
+```{r, include=FALSE}
+library(leaps)
+library(ModelMetrics)
+```
+## Q.9
+
+```{r}
+library(ISLR)
+data("College")
+College[1:3,]
+```
+```{r, include=FALSE}
+attach(College)
+```
+### Split College Dataset
+```{r}
+# Split College data set
+set.seed(1)
+split = sample(777, 389)
+
+# training set
+train = College[split,]
+# testing set
+test = College[-split,]
+```
+### Test Error of a Linear Model
+
+```{r}
+# linear model using least squares on training set
+lm.fit=lm(Apps ~ . , data = train)
+lm.preds = predict(lm.fit, newdata = test, type = "response")
+# test error
+error=mse(test$Apps,lm.preds)
+error
+```
+The test error of the linear model is approximately 1138680.
+
+### Test Error of a Ridge Regression Model
+```{r, include=FALSE}
+library(glmnet)
+library(Matrix)
+```
+```{r}
+set.seed(1)
+
+# train and test 
+x.train = model.matrix(Apps ~ ., data=train)[, -1]
+x.test = model.matrix(Apps ~ ., data=test)[, -1]
+
+y.train= train$Apps
+y.test = College$Apps
+```
+```{r}
+# choose λ using cross-validation
+cv.out.ridge=cv.glmnet(x.train,y.train,alpha=0)
+ridge.bestlam=cv.out.ridge$lambda.min
+
+# ridge regression model on training set, with λ chosen by cross-validation
+ridge.fit = glmnet(x.train,
+                   y.train,
+                   alpha = 0,
+                   lambda = ridge.bestlam)
+ridge.pred = predict(ridge.fit, s = ridge.bestlam, newx = x.test)
+# test error
+error = mse(test$Apps, ridge.pred)
+error
+```
+The test error of the ridge regression model is approximately 979026.3.
+
+### Test Error and Non-zero Coefficient Estimates of a Lasso Model
+```{r}
+cv.out.lasso=cv.glmnet(x.train,y.train,alpha=1)
+lasso.bestlam=cv.out.lasso$lambda.min
+
+# lasso model on training set
+lasso.fit = glmnet(x.train,
+                   y.train,
+                   alpha = 1,
+                   lambda = lasso.bestlam)
+lasso.pred = predict(lasso.fit, s = lasso.bestlam, newx = x.test)
+# test error
+error = mse(test$Apps, lasso.pred)
+error
+
+# non-zero Coefficient Estimates
+lasso.coef = predict(lasso.fit, type = "coefficients", s = lasso.bestlam)[1:length(lasso.fit$beta), ]
+lasso.coef[lasso.coef != 0]
+```
+The test error of the Lasso Model is approximately 1119383.
+
+### Test Error and Value of M of a PCR Model
+```{r, include=FALSE}
+library(pls)
+```
+```{r}
+# pcr model on training set
+pcr.fit = pcr(
+  Apps ~ .,
+  data = train ,
+  scale = TRUE,
+  validation = "CV"
+)
+
+#value of M
+M=pcr.fit$ncomp
+M
+
+pcr.pred = predict(pcr.fit, newx = x.test, ncomp = 17)
+# test error
+error = mse(test$Apps, pcr.pred)
+error
+```
+The test error of the pcr model is approximately 28083385.
+
+### Test Error and Value of M of a PLS Model
+```{r}
+# pls model on training set
+pls.fit = plsr(
+  Apps ~ .,
+  data = train ,
+  scale = TRUE,
+  validation = "CV"
+)
+
+#value of M
+M=pls.fit$ncomp
+M
+
+pls.pred = predict(pls.fit, newx = x.test, ncomp = 17)
+
+# test error
+error = mse(test$Apps, pls.pred)
+error
+```
+The test error of the pls is approximately 28083385.
+
+The pls model and the pcr model have the highest test errors and the ridge regression model has the lowest test error. So the ridge regression model will give the most accurate prediction of the number of college applications received.
+```{r}
+detach(College)
+```
+
+## Q.11
+
+```{r, nclude = FALSE}
+library(MASS)
+data("Boston")
+Boston[1:3,]
+```
+```{r, include=FALSE}
+attach(Boston)
+```
+### Split Boston Dataset
+```{r}
+# Split Boston data set
+set.seed(1)
+split2 = sample(506, 253)
+
+# training set
+train2 = Boston[split2,]
+# testing set
+test2 = Boston[-split2,]
+```
+### Test Error of a best subset selection
+```{r}
+library(ModelMetrics)
+k = 10
+
+# folds = j are in the test set and the rest are in the training set
+folds <- sample(1:k, nrow(Boston), replace = TRUE)
+cv.errors <- matrix(NA, k, 13, dimnames = list(NULL, paste(1:13)))
+
+library(leaps)
+
+# predict method for regsubsets
+predict.regsubsets = function(object, newdata, id, ...) {
+    form = as.formula(object$call[[2]])
+    mat = model.matrix(form, newdata)
+    coefi = coef(object, id = id)
+    mat[, names(coefi)] %*% coefi
+}
+
+# performs cross-validation
+for (j in 1:k) {
+  best.fit = regsubsets(crim ~ ., data = Boston[folds != j,], nvmax = 13)
+  for (i in 1:13) {
+    pred = predict(best.fit, Boston[folds == j,], id = i)
+    cv.errors[j, i] <- mse(Boston$crim[folds == j], pred)
+  }
+}
+mean.cv.errors = apply(cv.errors, 2, mean)
+plot(mean.cv.errors,
+     type = "b",
+     xlab = "Number of variables",
+     ylab = "CV error")
+
+```
+```{r}
+```
+
+The cross-validation selects a 12 variables model. The test error of the best subset model is approximately 40.29928
+
+### Test Error of a Ridge Regression Model
+
+```{r}
+# train and test 
+x.train2 = model.matrix(crim ~ ., data=train2)[, -1]
+x.test2 = model.matrix(crim ~ ., data=test2)[, -1]
+
+y.train2= train2$crim
+y.test2 = Boston$crim
+```
+```{r}
+# choose λ using cross-validation
+cv.out.ridge2=cv.glmnet(x.train2,y.train2,alpha=0)
+ridge.bestlam2=cv.out.ridge2$lambda.min
+
+# ridge regression model on training set, with λ chosen by cross-validation
+ridge.fit2 = glmnet(x.train2,
+                   y.train2,
+                   alpha = 0,
+                   lambda = ridge.bestlam2)
+ridge.pred2 = predict(ridge.fit2, s = ridge.bestlam2, newx = x.test2)
+# test error
+error = mse(test2$crim, ridge.pred2)
+error
+```
+The test error of the ridge regression model is approximately 40.9232.
+
+### Test Error and Non-zero Coefficient Estimates of a Lasso Model
+```{r}
+cv.out.lasso2=cv.glmnet(x.train2,y.train2,alpha=1)
+lasso.bestlam2=cv.out.lasso2$lambda.min
+lasso.bestlam2
+
+# lasso model on training set
+lasso.fit2 = glmnet(x.train2,
+                   y.train2,
+                   alpha = 1,
+                   lambda = lasso.bestlam2)
+lasso.pred2 = predict(lasso.fit2, s = lasso.bestlam2, newx = x.test2)
+# test error
+error = mse(test2$crim, lasso.pred2)
+error
+
+# non-zero Coefficient Estimates
+lasso.coef = predict(lasso.fit2, type = "coefficients", s = lasso.bestlam2)[1:length(lasso.fit2$beta), ]
+lasso.coef[lasso.coef != 0]
+```
+The test error of the lasso is approximately 40.89965.
+### Test Error and Value of M of a PCR Model
+
+```{r}
+# pcr model on training set
+pcr.fit2 = pcr(
+  crim ~ .,
+  data = train2 ,
+  scale = TRUE,
+  validation = "CV"
+)
+
+#value of M
+M=pcr.fit2$ncomp
+M
+
+pcr.pred2 = predict(pcr.fit2, newx = x.test2, ncomp = 13)
+# test error
+error = mse(test2$crim, pcr.pred2)
+error
+```
+The test error of the PCR is approximately  109.997.
+
+The pcr model has the highest test error and the best subset model has the lowest test error. So the best subset model performs the best.
+
+The model chosen by best subset only involves 12 predictors instead of all 13 predictors.

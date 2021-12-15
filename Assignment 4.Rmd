@@ -1,0 +1,281 @@
+---
+title: "Assignment 4"
+author: "Sumaiya Shefa"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Q.5 
+```{r, message=FALSE, include=FALSE}
+library(ISLR)
+data("Default")
+head(Default)
+attach(Default)
+```
+
+### Logistic Regression Model
+```{r}
+# logistic regression model
+glm.fit = glm(default ~ income + balance, data = Default, family = "binomial")
+summary(glm.fit)
+```
+### Test Error
+```{r}
+# split sample set into a training set and a validation set
+set.seed(1)
+train = sample(10000, 5000)
+
+# fit a multiple logistic regression model using training observations
+glm.fit_train = glm(default ~ income + balance, data = 
+                    Default, family = "binomial", 
+                    subset = train)
+
+# validation set
+pred_data = Default[-train,]
+
+# prediction
+probs= predict(glm.fit_train, pred_data, type =
+                 "response")
+
+# replicate the word "No" 9500 times
+pred = rep("No",5000)
+
+# if the probability is more than 0.5 then set to "Yes
+pred[probs > 0.5] = "Yes"
+
+# validation set error
+err = mean(pred!=pred_data$default)
+err
+```
+### Test Error with a Different Split No.1
+```{r}
+# split sample set into a training set and a validation set
+train1 = sample(10000, 7500)
+
+# fit a multiple logistic regression model using training observations
+glm.fit_train1 = glm(default ~ income + balance, data =
+                       Default, subset = train1, family
+                     = "binomial")
+
+# validation set
+pred_data1 = Default[-train1,]
+
+# prediction
+probs1= predict(glm.fit_train1, pred_data1, type = "response")
+
+# replicate the word "No" 2500 times
+pred1 = rep("No", 2500)
+
+# if the probability is more than 0.5 then set to "Yes
+pred1[probs1 > 0.5] = "Yes"
+
+# validation set error
+err1 = mean(pred1!=pred_data1$default)
+err1
+```
+### Test Error with a Different Split No.2
+```{r}
+# split sample set into a training set and a validation set
+train2 = sample(10000, 3500)
+
+# fit a multiple logistic regression model using training observations
+glm.fit_train2 = glm(default ~ income + balance, data =
+                       Default, subset = train2, family
+                     = "binomial")
+
+# validation set
+pred_data2 = Default[-train2,]
+
+# prediction
+probs2= predict(glm.fit_train2, pred_data2, type =
+                  "response")
+
+# replicate the word "No" 6500 times
+pred2 = rep("No", 6500)
+
+# if the probability is more than 0.5 then set to "Yes
+pred2[probs2 > 0.5] = "Yes"
+
+# validation set error
+err2 = mean(pred2!=pred_data2$default)
+err2
+```
+### Test Error with a Different Split No.3
+```{r}
+# split sample set into a training set and a validation set
+train3 = sample(10000, 1000)
+
+# fit a multiple logistic regression model using training observations
+glm.fit_train3 = glm(default ~ income + balance, data = Default, subset = train3, 
+                     family = "binomial")
+
+# validation set
+pred_data3 = Default[-train3,]
+
+# prediction
+probs3= predict(glm.fit_train3, pred_data3, type =
+                  "response")
+
+# replicate the word "No" 9000 times
+pred3 = rep("No", 9000)
+
+# if the probability is more than 0.5 then set to "Yes
+pred3[probs3 > 0.5] = "Yes"
+
+# validation set error
+err3 = mean(pred3!=pred_data3$default)
+err3
+```
+When the data was split in 7500 training and 2500 test observations, the error rate was 0.0256. When the data was split in 5000 training and 5000 test observations, the error rate was 0.0254. When the data was split in 3500 training and 6500 test observations, the error rate was 0.0256. When the data was split in 1000 training and 9000 test observations, the error rate was 0.0272. In conclusion, the error rate varies depending on number of observations in the test set and the training set.
+
+### Test Error with a Dummy Variable Student
+```{r}
+# split sample set into a training set and a validation set
+train_stud = sample(10000, 5000)
+
+# fit a multiple logistic regression model using training observations
+glm.fit_train_stud = glm(default ~ income + balance + student, 
+                         data = Default, subset = train_stud, family = "binomial")
+
+# validation set
+pred_data_stud = Default[-train_stud,]
+
+# prediction
+probs_stud= predict(glm.fit_train_stud, pred_data_stud, type = "response")
+
+# replicate the word "No" 2500 times
+pred_stud = rep("No", 5000)
+
+# if the probability is more than 0.5 then set to "Yes
+pred_stud[probs_stud > 0.5] = "Yes"
+
+# validation set error
+err_student = mean(pred_stud!=pred_data_stud$default)
+err_student
+```
+When the data was split in 5000 training and 5000 testing observations, using the income and balance predictors produced an error rate of 0.0254. In the same split, using the income and balance predictors and the dummy variable student produced an error rate of 0.0282. The error rate did not reduce but increased instead.
+
+## Q.6
+
+### Estimated standard errors for the coefficients associated with income and balance 
+```{r}
+library(car)
+
+# logistic regression model
+glm.fit = glm(default ~ income + balance, data = Default, family = "binomial")
+
+# standard errors for the coefficients
+compareCoefs(glm.fit, digits = 4)
+```
+### Coefficient Estimates for income and balance
+```{r}
+library(boot)
+
+set.seed(1)
+boot.fn <- function(data, index) 
+{
+# input the Default data set and an index of the observations
+    coef_fit<- glm(default ~ income + balance, data =
+                     data, family = 
+                     "binomial", subset = index)
+    return(coef(coef_fit))
+}
+# the coefficient estimates for income and balance
+coef_est = boot(Default, boot.fn, 1000)
+coef_est$t0
+```
+### Standard Errors
+```{r}
+std_err = boot(Default,boot.fn, 1000)
+std_err
+```
+the estimated standard errors obtained using the glm() function and using the bootstrap function are relatively same.
+```{r}
+detach(Default)
+```
+## Q.9
+```{r, message=FALSE, include=FALSE}
+library(MASS)
+data("Boston")
+head(Boston)
+attach(Boston)
+```
+### Estimate for the Population Mean, $\hat{\mu}$
+```{r}
+mu_hat = mean(medv)
+mu_hat
+```
+### Estimate of the Standard Error of $\hat{\mu}$
+```{r}
+stderr = sd(medv)/sqrt(506)
+stderr
+```
+### Estimate of the Standard Error of $\hat{\mu}$ using bootsrap
+```{r}
+library(boot)
+
+set.seed(1)
+boot.fn <- function(data, index) 
+{
+    mu <- mean(data[index])
+    return (mu)
+}
+boot_stderr = boot(medv, boot.fn, 1000)
+boot_stderr
+```
+The standard error 0.4088611 from using the formula and the standard error 0.4106622 from the bootstrap function are relatively the same.
+
+### 95% Confidence Interval for the Mean of medv
+```{r}
+# confidence interval using boot.ci function
+confid_boot = boot.ci(boot_stderr, conf = 0.95, type = "norm")
+confid_boot
+
+# confidence interval using the formula [mu_hat - 2SE(mu_hat), mu_hat + 2SE(mu_hat)]
+confid_form = c(22.53281 - 2*0.4106622, 22.53281 + 2*0.4106622) 
+confid_form
+
+# confidence interval using t-test
+confid_t_test= t.test(medv)
+confid_t_test
+```
+The 95% confidence interval from the formula (21.71149, 23.35413) and the t-test (21.72953, 23.33608) are very close.
+### Estimate, med, for the Median Value of medv
+```{r}
+mu_med = median(medv)
+mu_med
+```
+### Standard Error of $\hat{\mu}$
+```{r}
+boot.fn <- function(data, index) {
+    mu <- median(data[index])
+    return (mu)
+}
+mu_med_stderr = boot(medv, boot.fn, 1000)
+mu_med_stderr
+```
+### Estimate of the Tenth Percentile of medv in Boston Suburbs, ${{\hat{\mu}}_{0.1}}$
+```{r}
+mu_0.1 <- quantile(medv, c(0.1))
+mu_0.1
+```
+### Standard Error of ${{\hat{\mu}}_{0.1}}$
+```{r}
+boot.fn <- function(data, index) {
+  mu <- quantile(data[index], c(0.1))
+  return (mu)
+}
+mu_0.1_stderr = boot(medv, boot.fn, 1000)
+mu_0.1_stderr
+```
+The standard error of $\hat{\mu}$ is 0.378725 and ${{\hat{\mu}}_{0.1}}$ is 0.4934503 are vastly different.The standard error increased when it was estimated with tenth percentile of medv in Boston suburbs.
+```{r}
+detach(Boston)
+```
+

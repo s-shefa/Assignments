@@ -1,0 +1,463 @@
+---
+title: "Assignment 3"
+author: "Sumaiya Shefa"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    toc_depth: 2
+    css: styles.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Chapter 04 (page  168): 10, 11, 13
+```{r, include=FALSE}
+library(ISLR)
+library(MASS)
+library(ggplot2)
+library(GGally)
+```
+## Q.10
+```{r, include=FALSE}
+data("Weekly")
+head(Weekly)
+```
+```{r, include=FALSE, echo=FALSE}
+attach(Weekly)
+```
+### (a) Produce some numerical and graphical summaries of the Weekly data. Do there appear to be any patterns?
+### Numerical and Graphical Summaries
+```{r, warning=FALSE,message=FALSE}
+library(GGally)
+
+# pairwise graph
+ggpairs(Weekly, upper = "blank", ggplot2::aes(colour = Year))
+```
+### Correlation Matrix
+```{r}
+cor(Weekly[, -9])
+```
+The correlation matrix shows that most of the variables have very little correlation. The only significant correlation seems to be between Year and Volume with a value of 0.8419.
+```{r}
+# scatterplot
+ggplot(data = Weekly, mapping = aes(x = Year, y = Volume)) +
+  geom_point(colour = "skyblue")
+```
+```{r}
+```
+A closer look at the graph confirms that there is indeed a positive correlation between Year and Volume variable. The Volume of shares traded (average number of daily shares traded in billions) increases between 1990 and 2010.
+```{r}
+```
+### (b) Use the full data set to perform a logistic regression with Direction as the response and the five lag variables plus Volume as predictors. Use the summary function to print the results. Do any of the predictors appear to be statistically significant? If so, which ones?
+### Logistic Regression
+```{r}
+# logistic regression model
+glm.fit_Weekly = glm(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, data = Weekly, family = binomial)
+summary (glm.fit_Weekly)
+```
+The only predictor that appears to be significant is Lag2 which has a p value that is less than 0.05. So the percentage return for 2 weeks ago is significant in our logistic regression model.
+```{r}
+```
+### (c) Compute the confusion matrix and overall fraction of correct predictions. Explain what the confusion matrix is telling you about the types of mistakes made by logistic regression.
+
+### Confusion Matrix and Correct Predictions
+```{r}
+# predict the probabilities
+glm.probs_Weekly = predict.glm(glm.fit_Weekly, Weekly, type = "response")
+
+# replicate the word "Down" 1089 times
+glm.pred_Weekly = rep("Down", 1089)
+
+# if the probability is more than 0.5 then set the Direction to Up
+glm.pred_Weekly[glm.probs_Weekly > 0.5] = "Up"
+
+# confusion matrix
+table(glm.pred_Weekly, Weekly$Direction)
+
+# correct predictions : (Up + Down)/Total Observations
+(557 + 54) / 1089
+```
+The result shows that the logistic regression model correctly predicted the movement of the stock market 56.11% of the time.
+However, the training error rate 100% - 56.11% = 43.89% and usually the training error rate is often overly optimistic-it tends to underestimate the test error rate.To get a more accurate model we can fit the logistic regression model using part of the data. 
+```{r}
+```
+### (d) Now fit the logistic regression model using a training data period from 1990 to 2008, with Lag2 as the only predictor. Compute the confusion matrix and the overall fraction of correct predictions for the held out data (that is, the data from 2009 and 2010).
+
+```{r}
+# boolean vector element for Year from 1990 to 2008
+train_Weekly = (Weekly$Year <= 2008)
+test_Weekly = (!train_Weekly)
+# subset data where Year > 2009
+Weekly.2008 = Weekly[test_Weekly , ]
+Direction.2008 = Direction[test_Weekly]
+
+# dimensions of subset Direction.2008
+dim(Weekly.2008)
+```
+The output above indicates that there are 104 observations that are FALSE on the training data set. So there are 104 observations that are from 2009 to 2010. 
+Next we are going to fit a logistic regression model with Lag2 as the predictor.
+
+### Fitted Logistic Regression Model on Lag2
+```{r}
+# fit a logistic regression model on the subset train_Weekly with Lag2 as the predictor
+glm.fit.subset_Weekly = glm(Direction ~ Lag2,
+                            data = Weekly,
+                            family = binomial,
+                            subset = train_Weekly)
+
+# predict the probabilities on subset Weekly.2008
+glm.probs.subset_Weekly = predict (glm.fit.subset_Weekly, Weekly.2008, type = "response")
+
+# replicate the word "Down" 104 times
+glm.pred.subset_Weekly = rep("Down", 104)
+
+# if the probability is more than 0.5 then set the Direction to Up
+glm.pred.subset_Weekly[glm.probs.subset_Weekly > 0.5] = " Up"
+
+# confusion matrix
+table(glm.pred.subset_Weekly, Direction.2008)
+
+# correct predictions : Total Observations/(Up + Up*Down)
+56 / (56 + 34)
+```
+The result of the new model with only Lag2 as the predictor shows that the logistic regression model correctly predicted the movement of the stock market 62.22% of the time. which is slightly better than the previous model with 56.66%.
+```{r}
+```
+### (e) Repeat (d) using LDA.
+### Linear Discriminant Analysis
+```{r}
+# fit a LDA model using observations from 1990 to 2008
+lda.fit_Weekly = lda(Direction ~ Lag2, data = Weekly, subset = train_Weekly)
+lda.fit_Weekly
+```
+The output shows that 44.77% of the training observations corresponds to days when the stock market went down and 55.23% of the training observations corresponds to days when the stock market went up.
+```{r}
+# prediction
+lda.pred_Weekly = predict(lda.fit_Weekly, Weekly.2008)
+lda.class = lda.pred_Weekly$class
+# confusion matrix
+table(lda.class , Direction.2008)
+# correct predictions rate
+mean(lda.class == Direction.2008)
+
+# applying 50% threshold
+sum(lda.pred_Weekly$posterior[, 1] >= .5)
+sum(lda.pred_Weekly$posterior[, 1] < .5)
+```
+The result of the linear discriminant analysis(lda) regression on the new model with only Lag2 as the predictor shows that the lda model correctly predicts the movement of the stock market 62.50% of the time. This is almost identical to the new logistic regression model that correctly predicted the movement of the stock market 62.22% of the time.
+
+The probability is higher on the lower part of the threshold which suggests that the movement of the market will decrease.
+```{r}
+```
+### (f) Repeat (d) using QDA.
+### Quadratic Discriminant Analysis
+```{r}
+qda.fit = qda(Direction ~ Lag2 , data = Weekly , subset = train_Weekly)
+qda.fit
+
+qda.class_Weekly = predict(qda.fit , Weekly.2008)$class
+# confusion matrix
+table(qda.class_Weekly , Direction.2008)
+# correct predictions rate
+mean(qda.class_Weekly == Direction.2008)
+```
+
+The output shows that the quadratic discriminant analysis regression is accurate 58.65% of the time.
+```{r}
+```
+### (g) Repeat (d) using KNN with K = 1.
+### Training and Testing Matrix
+```{r}
+library(class)
+
+# matrix with predictors of the training data
+train_Weekly.X = as.matrix(cbind(Weekly$Lag2)[train_Weekly, ])
+
+# matrix with predictors o the data for which we wish to make predictions
+test_Weekly.X = as.matrix(cbind(Weekly$Lag2)[test_Weekly, ])
+
+train_Weekly.Direction = Direction[train_Weekly]
+
+#dimensions of training data set
+dim(train_Weekly.X)
+```
+### K-Nearest Neighbors with K=1
+```{r}
+set.seed(1)
+knn.pred_Weekly = knn(train_Weekly.X, test_Weekly.X, train_Weekly.Direction , k = 1)
+# confusion matrix
+table(knn.pred_Weekly, Direction.2008)
+#test error rate
+mean(knn.pred_Weekly != Direction.2008)
+```
+The result shows that KNN correctly predicts 50% of the time.
+### (h) Which of these methods appears to provide the best results on this data?
+The Linear Discriminant Analysis(LDA) and logistic regression predictions are almost identical. The accuracy of LDA prediction percentage is the highest so therefore it performs the best on the data. QDA is the 3rd best and KNN is the worst of all four analysis.
+```{r}
+```
+### (i) Experiment with different combinations of predictors, including possible transformations and interactions, for each of the methods. Report the variables, method, and associated confusion matrix that appears to provide the best results on the held out data. Note that you should also experiment with values for K in the KNN classifier.
+### Additional Results Using All Lag Predictors
+```{r}
+# QDA fit
+qda.fit_weekly2 = qda(Direction ~ Lag1+Lag2+Lag3+Lag4+Lag5 , data = Weekly , subset = train_Weekly)
+qda.class_Weekly2 = predict(qda.fit_weekly2 , Weekly.2008)$class
+# confusion matrix
+table(qda.class_Weekly2 , Direction.2008)
+# correct predictions rate
+mean(qda.class_Weekly2 == Direction.2008)
+
+
+# LDA fit
+lda.fit_Weekly2 = lda(Direction ~ Lag1+Lag2+Lag3+Lag4+Lag5 , data = Weekly , subset = train_Weekly)
+# prediction
+lda.pred_Weekly2 = predict(lda.fit_Weekly2, Weekly.2008)
+lda.class2 = lda.pred_Weekly2$class
+# confusion matrix
+table(lda.class2 , Direction.2008)
+# correct predictions rate
+mean(lda.class2 == Direction.2008)
+
+
+# KKN fit with K=10
+predictors.set = cbind(Lag1, Lag2, Lag3, Lag4, Lag5)
+# matrix with predictors of the training data
+train_Weekly2.X = as.matrix(predictors.set)[train_Weekly, ]
+# matrix with predictors o the data for which we wish to make predictions
+test_Weekly2.X = as.matrix(predictors.set)[test_Weekly, ]
+knn.pred_Weekly2 = knn(train_Weekly2.X, test_Weekly2.X, train_Weekly.Direction , k = 10)
+# confusion matrix
+table(knn.pred_Weekly2, Direction.2008)
+#test error rate
+mean(knn.pred_Weekly2 != Direction.2008)
+```
+QDA accurately predicts 46.15% of the time. LDA accurately predicts 54.81% of the time. LDA accurately predicts 46.15% of the time. The accuracy is worse than the results obtained from using only Lag 2 as the predictors which indicates adding more predictors worsens the accuracy.
+```{r}
+```
+
+## Q.11
+
+```{r, include=FALSE}
+data("Auto")
+head(Auto)
+```
+```{r, include=FALSE}
+attach(Auto)
+```
+### (a) Create a binary variable, mpg01, that contains a 1 if mpg contains a value above its median, and a 0 if mpg contains a value below its median. 
+```{r}
+# Binary variable mpg01
+
+# 1 = above median, 0 = below median
+mpg01 <- ifelse(mpg > median(mpg), yes = 1, no = 0)
+#  data set containing mpg01 and other Auto variables
+Auto <- data.frame(Auto[1:9], mpg01)
+```
+### (b) Explore the data graphically in order to investigate the association between mpg01 and the other features. Which of the other features seem most likely to be useful in predicting mpg01? 
+### Correlation Matrix
+```{r}
+cor(Auto[, -9])
+```
+```{r, message=FALSE}
+# pairwise graphs
+ggpairs(Auto[, -9], upper = "blank", ggplot2::aes(colour = mpg01))
+ggpairs(Auto[, -c(1, 2, 7, 8, 9)], upper = "blank", ggplot2::aes(colour = mpg01))
+```
+```{r}
+```
+The predictors displacement, horsepower, wight, and acceleration seem most likely to be useful in predicting mpg01.
+
+### (c) Split the data into a training set and a test set.
+```{r}
+# split data
+set.seed(1)
+
+train_Auto = (Auto$year %% 2 == 0)
+test_Auto = (!train_Auto)
+
+# Testing set
+Auto.78 = Auto[test_Auto, ]
+mpg01.78 = Auto$mpg01[test_Auto]
+
+# dimensions of subset Auto.78
+dim(Auto.78)
+```
+### (d) Perform LDA on the training data in order to predict mpg01 using the variables that seemed most associated with mpg01 in (b). What is the test error of the model obtained?
+### Linear Discriminant Analysis
+```{r}
+lda.fit_Auto = lda(mpg01 ~  displacement + horsepower+ weight + acceleration, data = Auto, subset = train_Auto)
+# prediction
+lda.pred_Auto = predict(lda.fit_Auto, Auto.78)
+lda.class_Auto = lda.pred_Auto$class
+# confusion matrix
+table(lda.class_Auto , mpg01.78)
+#test error rate
+mean(lda.class_Auto != mpg01.78)
+```
+The test error of the model is 13.74%.
+```{r, echo=FALSE, include=FALSE}
+sum(lda.pred_Auto$posterior[,1]>=.5)
+sum(lda.pred_Auto$posterior[,1]<.5)
+```
+### (e) Perform QDA on the training data in order to predict mpg01 using the variables that seemed most associated with mpg01 in (b). What is the test error of the model obtained?
+### Quadratic Discriminant Analysis
+```{r}
+qda.fit_Auto=qda(mpg01 ~ displacement + horsepower+ weight + acceleration,data = Auto, subset = train_Auto)
+qda.fit_Auto
+```
+```{r}
+qda.class_Auto = predict(qda.fit_Auto, Auto.78)$class
+# confusion matrix
+table(qda.class_Auto, mpg01.78)
+#test error rate
+mean(qda.class_Auto != mpg01.78)
+```
+The test error of the model is 13.19%.
+```{r}
+```
+### (f) Perform logistic regression on the training data in order to predict mpg01 using the variables that seemed most associated with mpg01 in (b). What is the test error of the model obtained?
+### Logistic Regression
+```{r}
+# logistic regression model
+glm.fit_Auto = glm(mpg01 ~ displacement + horsepower+ weight + acceleration, data = Auto, subset = train_Auto, family = binomial)
+summary(glm.fit_Auto)
+```
+The only predictor that appears to be significant are displacement and horsepower with p values less than 0.05.
+
+### Confusion Matrix and Test Error
+```{r, message=FALSE}
+# predict the probabilities
+glm.probs_Auto = predict.glm(glm.fit_Auto, Auto, type = "response")
+
+# replicate the word "0" 392 times
+glm.pred_Auto = rep("0", 392)
+
+# if the probability is more than 0.5 then set mpg01 to 1
+glm.pred_Auto[glm.probs_Auto > 0.5] = "1"
+
+# confusion matrix
+table(glm.pred_Auto, mpg01)
+# test error rate
+mean(glm.pred_Auto != mpg01)
+```
+The test error of the model is 10.46%.
+```{r}
+```
+### (g) Perform KNN on the training data, with several values of K, in order to predict mpg01. Use only the variables that seemed most associated with mpg01 in (b). What test errors do you obtain? Which value of K seems to perform the best on this data set?
+### K-Nearest Neighbors
+```{r}
+library(class)
+train_Auto.X = cbind(horsepower, weight)[train_Auto, ]
+test_Auto.X = cbind(horsepower, weight)[!train_Auto, ]
+train_Auto.mpg01 = Auto$mpg01[train_Auto]
+```
+
+```{r}
+set.seed(1)
+knn.pred_Auto = knn(train_Auto.X, test_Auto.X, train_Auto.mpg01 , k = 30)
+# confusion matrix
+table(knn.pred_Auto, mpg01.78)
+#test error rate
+mean(knn.pred_Auto != mpg01.78)
+```
+K = 30 performs the best on this data. The test error of the model is 13.74%.
+```{r}
+```
+
+## Q.13
+### Binary Variable crim01
+```{r, include=FALSE}
+data("Boston")
+head(Boston)
+
+# 1 = above median, 0 = below median
+crim01 <- ifelse(Boston$crim > median(Boston$crim), 1, 0)
+#  data set containing crim01 and other Boston variables
+Boston <- data.frame(Boston[2:14], crim01)
+head(Boston)
+```
+
+```{r, message=FALSE, include=FALSE}
+attach(Boston)
+```
+### Pairwise Graph
+```{r, message=FALSE}
+ggpairs(Boston, upper = "blank", ggplot2::aes(colour = crim01))
+```
+```{r, message=FALSE}
+ggpairs(Boston[, c(3, 5, 9, 10, 14)], upper = "blank", ggplot2::aes(colour = crim01))
+```
+
+### Training Set and Testing Set
+```{r}
+library(caret)
+# split data
+inTrain = createDataPartition(Boston$crim, p=0.75, list = FALSE)
+train_Boston = Boston[inTrain,]
+test_Boston = Boston[-inTrain,]
+```
+
+### Logistic Regression
+```{r}
+# logistic regression model
+glm.fit_Boston = glm(crim01 ~ nox + rad + tax, data = train_Boston, family = binomial)
+summary(glm.fit_Boston)
+```
+The significant variables are nitrogen oxides concentration(nox), index of accessibility to radial highways(rad), and full-value property-tax rate per \$10,000(tax).
+### Confusion Matrix and Test Error
+```{r, message=FALSE}
+# predict the probabilities
+glm.probs_Boston = predict.glm(glm.fit_Boston, test_Boston, type = "response")
+
+# replicate the word "0" 506 times
+glm.pred_Boston = ifelse(glm.probs_Boston>median(glm.probs_Boston), "1", "0")
+
+# confusion matrix
+table(glm.pred_Boston, test_Boston$crim01)
+# correct predictions rate
+mean(glm.pred_Boston == test_Boston$crim01)
+# test error rate
+mean(glm.pred_Boston != test_Boston$crim01)
+```
+The test error of the model is 13.49%.
+
+### Linear Discriminant Analysis
+```{r}
+lda.fit_Boston = lda(crim01 ~ nox + rad + tax, data =  train_Boston)
+lda.fit_Boston
+```
+```{r}
+lda.pred_Boston = predict(lda.fit_Boston, test_Boston)
+lda.class_Boston = lda.pred_Boston$class
+# confusion matrix
+table(lda.class_Boston, test_Boston$crim01)
+# correct predictions rate
+mean(lda.class_Boston == test_Boston$crim01)
+#test error rate
+mean(lda.class_Boston != test_Boston$crim01)
+```
+
+### Training Matrix and Testing Matrix
+```{r}
+library(class)
+train_Boston.X = as.matrix(train_Boston[, c(4, 8,9)])
+test_Boston.X = as.matrix(test_Boston[, c(4, 8,9)])
+```
+
+### K-Nearest Neighbors with K = 1
+```{r}
+set.seed(1)
+knn.pred_Boston = knn(train_Boston.X, test_Boston.X, train_Boston$crim01 , k = 1)
+```
+```{r}
+# confusion matrix
+table(knn.pred_Boston, test_Boston$crim01)
+# correct predictions rate
+mean(knn.pred_Boston == test_Boston$crim01)
+#test error rate
+mean(knn.pred_Boston != test_Boston$crim01)
+```
+

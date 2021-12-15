@@ -1,0 +1,294 @@
+---
+title: "Assignment 7"
+author: "Sumaiya Shefa"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    toc_depth: 3
+    css: styles.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Q.3 
+### Consider the Gini index, classification error, and entropy in a simple classification setting with two classes. Create a single plot that displays each of these quantities as a function of $\hat{p}_{m1}$. The xaxis should display $\hat{p}_{m1}$, ranging from 0 to 1, and the y-axis should display the value of the Gini index, classification error, and entropy. 
+### Hint: In a setting with two classes, $\hat{p}_{m1}$ = 1 − $\hat{p}_{m2}$. You could make this plot by hand, but it will be much easier to make in R.
+```{r}
+p = seq(0, 1, 0.01)
+gini = p * (1 - p) * 2
+entropy = -(p * log(p) + (1 - p) * log(1 - p))
+class.err = 1 - pmax(p, 1 - p)
+matplot(p, cbind(gini, entropy, class.err), col = c("pink", "red", "purple"))
+```
+
+## Q.8 
+```{r, include=FALSE}
+library(ISLR)
+library(rpart)
+library(caret)
+library(ModelMetrics)
+```
+```{r, message=FALSE}
+data(Carseats)
+
+## Converting Sales into a Qualitative Response Variable
+# Yes if Sales > 8 and No otherwise
+Carseats$Sales=as.factor(ifelse(Carseats$Sales > 8,"Yes","No"))
+```
+### (a) Split the data set into a training set and a test set. 
+```{r}
+inTrain = createDataPartition(y=Carseats$Sales,p=0.75,list = FALSE)
+train = Carseats[inTrain,]
+test = Carseats[-inTrain,]
+```
+
+### (b) Fit a regression tree to the training set. Plot the tree, and interpret the results. What test MSE do you obtain?
+```{r}
+# fit a regression tree
+tree.carseats=rpart(Sales ~., data=train, method="anova", control=rpart.control(minsplit=15, cp=0.01))
+```
+#### Plot the tree
+```{r, message=FALSE}
+library(rattle)
+fancyRpartPlot(tree.carseats, main = "Tree Plot of Carseats", sub="", cex=0.5, palettes=c("Blues")) 
+```
+```{r}
+```
+The most important indicator of Sales appears to be shelving location, since the first branch differentiates Good locations from Bad and Medium locations.
+```{r}
+```
+
+#### Test MSE
+```{r}
+pred1=predict(tree.carseats, newdata=test)
+TestMSE1=mse(test$Sales,pred1)
+TestMSE1
+```
+
+### (c) Use cross-validation in order to determine the optimal level of tree complexity. Does pruning the tree improve the test MSE?
+```{r}
+printcp(tree.carseats)
+plotcp(tree.carseats, col = 4, pch=16, cex=1)
+```
+```{r}
+```
+#### Lowest Cross-validated Error
+```{r}
+tree.carseats$cptable[which.min(tree.carseats$cptable[,"xerror"]),"xerror"]
+```
+The tree with 3 nodes seems to be the best. It has the lowest cross-validated error of all.
+
+#### Optimal Level of Tree Complexity
+```{r}
+tree.carseats$cptable[which.min(tree.carseats$cptable[,"xerror"]),"CP"]
+```
+#### Pruning the Tree
+```{r}
+carseats.prune=prune(tree.carseats,cp=tree.carseats$cptable[which.min(tree.carseats$cptable[,"xerror"]),"CP"])
+
+fancyRpartPlot(carseats.prune, uniform=TRUE, main="Pruned Tree", sub="", palettes=c("Oranges"))
+```
+```{r}
+```
+#### Test MSE
+```{r}
+pred2=predict(carseats.prune, newdata=test)
+TestMSE2=mse(test$Sales,pred2)
+TestMSE2
+```
+Pruning the tree improved the test MSE.
+
+### (d) Use the bagging approach in order to analyze this data. What test MSE do you obtain? Use the importance() function to determine which variables are most important.
+```{r, message=FALSE}
+library(randomForest)
+
+Carseats.bag = randomForest(Sales~.,data=train,mtry = 10,importance = TRUE)
+```
+#### Test MSE
+```{r}
+pred3 = predict(Carseats.bag,newdata=test)
+TestMSE3 = mse(test$Sales, pred3)
+TestMSE3
+```
+
+```{r}
+# important variables
+importance(Carseats.bag)
+```
+
+```{r}
+library(colorspace)
+
+barplot(importance(Carseats.bag),axisnames = TRUE,  col = rainbow_hcl(10), beside = TRUE, legend.text = rownames(importance(Carseats.bag)),border = TRUE, args.legend = list(x = "topright"), width=1, xlim = c(3, 52))
+```
+```{r}
+```
+
+### (e) Use random forests to analyze this data. What test MSE do you obtain? Use the importance() function to determine which variables are most important. Describe the effect of m, the number of variables considered at each split, on the error rate obtained
+```{r}
+# fit random forest
+Carseats.rf=train(Sales ~ .,data=train,method='rf',trControl = trainControl("cv", number = 10),importance = TRUE)
+
+Carseats.rf
+```
+By default, 500 trees are trained. The optimal number of variables sampled at each split is 6 so m=6.
+```{r}
+```
+#### Test MSE
+```{r}
+pred4=predict(Carseats.rf, newdata=test)
+TestMSE4=mse(test$Sales,pred4)
+TestMSE4
+```
+
+```{r}
+# important variables
+varImp(Carseats.rf)
+```
+
+```{r}
+plot(varImp(Carseats.rf))
+```
+```{r}
+```
+
+The results indicate that across all of the trees considered in the random forest, the Price company charges for car seats at each site (Price) and the quality of the shelving location (ShelveLoc) are by far the two most important variables
+
+## Q.9
+
+```{r}
+library(ISLR)
+data(OJ)
+```
+
+### (a) Create a training set containing a random sample of 800 observations, and a test set containing the remaining observations.
+
+```{r}
+inTrain2 = sample(1070,800)
+train2 = OJ[inTrain2,]
+test2 = OJ[-inTrain2,]
+```
+### (b) Fit a tree to the training data, with Purchase as the response and the other variables as predictors. Use the summary() function to produce summary statistics about the tree, and describe the results obtained. What is the training error rate? How many terminal nodes does the tree have?
+```{r}
+# fit a tree
+tree.OJ=rpart(Purchase ~., data=train2, method="class", control=rpart.control(minsplit=15, cp=0.01))
+
+summary(tree.OJ, cp=1)
+```
+It has 4 terminal nodes.
+
+The most important indicator of Purchase appears to be Customer brand loyalty for Citrus Hill(LoyalCH). 
+
+#### Training Error Rate
+```{r}
+pred_mat1=predict(tree.OJ,train2, type = "class")
+TrainErr = mean(pred_mat1 != train2$Purchase)
+TrainErr
+```
+```{r, include=FALSE, echo=FALSE}
+#### Training Error Rate
+# table(pred_mat1, train2$Purchase)
+# (50+66)/800 = 0.145
+# caret::confusionMatrix(pred_mat1, train2$Purchase)= 1-Accuracy
+```
+
+### (c) Type in the name of the tree object in order to get a detailed text output. Pick one of the terminal nodes, and interpret the information displayed.
+```{r}
+tree.OJ
+```
+### (d) Create a plot of the tree, and interpret the results.
+
+```{r, message=FALSE}
+library(rattle)
+
+fancyRpartPlot(tree.OJ, main = "Tree Plot of Orange Juice Data", sub="", cex=0.6, palettes=c("Blues")) 
+```
+```{r}
+```
+
+The most important indicator of Purchase appears to be Customer brand loyalty for Citrus Hill(LoyalCH), since the first branch differentiates from LoyalCH >=0.48.
+
+### (e) Predict the response on the test data, and produce a confusion matrix comparing the test labels to the predicted test labels. What is the test error rate?
+```{r}
+pred_mat2=predict(tree.OJ, test2, type = "class")
+
+# confusion matrix
+table(pred_mat2, test2$Purchase)
+```
+
+#### Test Error Rate
+```{r}
+TestErr = mean(pred_mat2 != test2$Purchase)
+TestErr
+```
+```{r, include=FALSE, echo=FALSE}
+#### Training Error Rate
+# table(pred_mat2, test2$Purchase)
+# (27+26)/270 = 0.1962963
+# caret::confusionMatrix(pred_mat2, test2$Purchase)= 1-Accuracy
+```
+### (f) Apply the cv.tree() function to the training set in order to determine the optimal tree size.
+
+```{r, message=FALSE}
+library(tree)
+
+tree.cv.OJ=cv.tree(tree(Purchase ~ ., data = train2), FUN = prune.tree, K = 10)
+tree.cv.OJ
+```
+
+### (g) Produce a plot with tree size on the x-axis and cross-validated classification error rate on the y-axis.
+
+```{r}
+plot(tree.cv.OJ$size, tree.cv.OJ$dev, type = "b", xlab = "Tree size", ylab = "Cross Validation Error", col="purple", pch=16)
+```
+```{r}
+```
+
+### (h) Which tree size corresponds to the lowest cross-validated classification error rate?
+```{r}
+tree.cv.OJ$dev[5]
+```
+
+Tree Size of 5 has the lowest cross-validated classification error rate.
+
+### (i) Produce a pruned tree corresponding to the optimal tree size obtained using cross-validation. If cross-validation does not lead to selection of a pruned tree, then create a pruned tree with five terminal nodes.
+```{r}
+OJ.prune = prune.misclass(tree(Purchase ~ ., data = train2), best = 5)
+plot(OJ.prune, main="Pruned Tree", col = "limegreen")
+text(OJ.prune, pretty=0, col = "darkgreen")
+```
+```{r}
+```
+
+### (j) Compare the training error rates between the pruned and unpruned trees. Which is higher?
+
+#### Training Error Rate of Pruned Tree
+```{r}
+pred_mat3=predict(OJ.prune,train2, type = "class")
+TrainErr2 = mean(pred_mat3 != train2$Purchase)
+TrainErr2
+```
+#### Training Error Rate of Unpruned Tree
+```{r}
+TrainErr
+```
+The training error rate of unpruned tree is higher.
+```{r}
+```
+### (k) Compare the test error rates between the pruned and unpruned trees. Which is higher?
+
+#### Test Error Rate of Pruned Tree
+```{r}
+pred_mat4=predict(OJ.prune,test2, type = "class")
+TestErr2 = mean(pred_mat4 != test2$Purchase)
+TestErr2
+```
+#### Test Error Rate of Unpruned Tree
+```{r}
+TestErr
+```
+The test error rate of pruned tree is higher.

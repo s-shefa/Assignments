@@ -1,0 +1,505 @@
+---
+title: "Assignment 8"
+author: "Sumaiya Shefa"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    toc_depth: 3
+    css: styles.css
+  
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r, message=FALSE, include=FALSE, echo=FALSE}
+### Test and Train Error Formula ###
+
+## Train Error
+# train.pred = predict(fit.train.set, train.set)
+# mean(train.pred!= train.set$variable)
+# 
+# ## Test Error
+# test.pred = predict(fit.train.set, test.set)
+# mean(test.pred != test.set$variable)
+```
+
+## Q.5
+#### (a) Generate a data set with n = 500 and p = 2
+```{r}
+x1=runif (500) -0.5
+x2=runif (500) -0.5
+y=1*(x1^2-x2^2 > 0)
+```
+
+#### (b) Plot the observations, colored according to their class labels.
+```{r}
+library(ggplot2)
+
+ggplot() + geom_point(
+  mapping = aes(x1[y == 0], x2[y == 0]),
+  col = "blue",
+  alpha = 0.5,
+  size = 2
+) + geom_point(
+  mapping = aes(x1[y == 1], x2[y == 1]),
+  col = "orange",
+  alpha = 0.8,
+  size = 2
+) + labs(x = "x1", y = "x2")
+```
+```{r}
+```
+
+#### (c) Fit a logistic regression model
+```{r}
+df=as.data.frame(cbind(x1, x2, y))
+
+glm.fit = glm(y ~ ., df, family = "binomial")
+summary(glm.fit)
+```
+#### (d) Apply this model to the training data in order to obtain a predicted class label for each training observation. Plot the observations, colored according to the predicted class labels. The decision boundary should be linear.
+```{r, message=FALSE}
+glm.probs = predict(glm.fit, newdata = df, type = "response")
+glm.preds = ifelse(glm.probs > 0.5, 1, 0)
+pred1 = df[glm.preds == 1, ]
+pred2 = df[glm.preds == 0, ]
+
+ggplot() +
+  geom_point(
+    data = pred1,
+    mapping = aes(x1, x2),
+    col = "slateblue",
+    alpha = 0.8,
+    size = 2
+  ) +
+  geom_point(
+    data = pred2,
+    mapping = aes(x1, x2),
+    col = "skyblue2",
+    alpha = 0.8,
+    size = 2
+  ) 
+```
+```{r}
+```
+
+#### (e) Now fit a logistic regression model to the data using non-linear functions of X1 and X2 as predictors (e.g. X2^1 , X1×X2, log(X2), and so forth).
+```{r, warning=FALSE}
+glm.fit2 = glm(y ~ I(x1^2) + I(x2^2) + I(x1^3) + I(x2^3) + (x1 * x2), family = "binomial", data=df)
+summary(glm.fit2)
+```
+
+#### (f) Apply this model to the training data in order to obtain a predicted class label for each training observation. Plot the observations, colored according to the predicted class labels. The decision boundary should be obviously non-linear. If it is not, then repeat (a)-(e) until you come up with an example in which the predicted class labels are obviously non-linear.
+
+```{r, message=FALSE}
+glm.probs2 = predict(glm.fit2, newdata = df, type = "response")
+glm.preds2 = ifelse(glm.probs2 > 0.5, 1, 0)
+
+pred3 = df[glm.preds2==1,]
+pred4 = df[glm.preds2==0,]
+
+ggplot()+
+    geom_point(data=pred3, mapping = aes(x1, x2), col = 
+                 "yellowgreen", alpha=0.8, size=2)+
+    geom_point(data=pred4, mapping = aes(x1, x2), col = 
+                 "turquoise4", alpha=0.5, size=2)
+
+```
+```{r}
+```
+#### (g) Fit a support vector classifier to the data with X1 and X2 as predictors. Obtain a class prediction for each training observation. Plot the observations, colored according to the predicted class labels.
+```{r}
+library(e1071)
+
+svm.fit <- svm(as.factor(y)~ ., data=df, kernel ="linear", cost=0.1)
+
+summary(svm.fit)
+```
+
+```{r}
+svm.probs = predict(svm.fit, df)
+
+pred5 = df[svm.probs==1,]
+pred6 = df[svm.probs==0,]
+
+ggplot() +
+  geom_point(
+    data = pred5,
+    mapping = aes(x1, x2),
+    col = "skyblue" ,
+    size = 2, alpha=0.8
+  ) +
+  geom_point(
+    data = pred6,
+    mapping = aes(x1, x2),
+    col = "orange2",
+    size = 2, alpha=0.6
+  ) 
+plot(svm.fit, df)
+```
+```{r}
+```
+
+#### (h) Fit a SVM using a non-linear kernel to the data. Obtain a class prediction for each training observation. Plot the observations,colored according to the predicted class labels.
+```{r}
+svm.fit2 <- svm(as.factor(y)~ x1 + x2, data=df, method = "radial", cost=0.1)
+summary(svm.fit2)
+```
+
+```{r}
+svm.probs2 = predict(svm.fit2, df)
+
+pred7 = df[svm.probs2==1,]
+pred8 = df[svm.probs2==0,]
+
+ggplot() +
+  geom_point(
+    data = pred7,
+    mapping = aes(x1, x2),
+    col = "skyblue" ,
+    size = 2, alpha=0.8
+  ) +
+  geom_point(
+    data = pred8,
+    mapping = aes(x1, x2),
+    col = "orange2",
+    size = 2, alpha=0.6
+  ) 
+plot(svm.fit2, df)
+```
+```{r}
+```
+
+## Q.7
+#### (a) Create a binary variable that takes on a 1 for cars with gas mileage above the median, and a 0 for cars with gas mileage below the median.
+```{r, message=FALSE}
+library(ISLR)
+data("Auto")
+
+mpg01 = ifelse(Auto$mpg > median(Auto$mpg), 1,0)
+Auto01 = data.frame(Auto[-c(1,9)], mpg01)
+```
+```{r, message=FALSE, include=FALSE}
+attach(Auto01)
+```
+
+#### (b) Fit a support vector classifier to the data with various values of cost, in order to predict whether a car gets high or low gas mileage. Report the cross-validation errors associated with different values of this parameter. Comment on your results.
+```{r}
+set.seed(1)
+tune.lin=tune(svm,mpg01~.,data=Auto01,kernel ="linear",ranges=list(cost=c(0.001, 0.01, 0.1, 1,5,10,100)))
+summary(tune.lin)
+```
+Cost = 0.01 results in the lowest cross-validation error rate.
+#### (c) Now repeat (b), this time using SVMs with radial and polynomial basis kernels, with different values of gamma and degree and cost. Comment on your results.
+```{r}
+tune.rad <- tune(svm, mpg01 ~ ., data = Auto01, kernel = "radial", ranges = list(cost = c(0.1, 1, 5, 10), gamma = c(0.01, 0.1, 1, 5, 10, 100)))
+summary(tune.rad)
+```
+Cost = 1 results in the lowest cross-validation error rate.
+```{r}
+tune.poly <- tune(svm, mpg01 ~ ., data = Auto01, kernel = "polynomial", ranges = list(cost = c(0.1, 1, 5, 10), degree = c(2, 3, 4)))
+summary(tune.poly)
+```
+Cost = 10 and degree = 3 results in the lowest cross-validation error rate.
+
+#### (d) Make some plots to back up your assertions in (b) and (c).Hint: In the lab, we used the plot() function for svm objects only in cases with p = 2. When p > 2, you can use the plot() function to create plots displaying pairs of variables at a time. 
+```{r}
+svm.lin = svm(as.factor(mpg01) ~ ., data = Auto01, kernel = "linear", cost = 0.01)
+svm.poly = svm(as.factor(mpg01) ~ ., data = Auto01, kernel = "polynomial", cost = 10, 
+    degree = 3)
+svm.rad = svm(as.factor(mpg01) ~ ., data = Auto01, kernel = "radial", cost = 1, gamma = 1)
+```
+```{r}
+Auto02 = data.frame(Auto01, Auto[c(1)])
+
+# for slicing
+m.acc <- mean(acceleration)
+m.wt <- mean(weight)
+m.hp <- mean(horsepower)
+m.dp <- mean(displacement)
+m.mpg <- mean(Auto$mpg)
+```
+##### Plots
+```{r}
+# linear
+plot(
+  svm.lin,
+  Auto02,
+  mpg ~ acceleration,
+  main = "Linear: mpg~acceleration",
+  slice = list(displacement = m.dp, horsepower = m.hp)
+)
+plot(
+  svm.lin,
+  Auto02,
+  mpg ~ displacement,
+  main = "Linear: mpg~displacement",
+  slice = list(acceleration = m.acc, horsepower = m.hp)
+)
+plot(
+  svm.lin,
+  Auto02,
+  mpg ~ horsepower,
+  main = "Linear: mpg~horsepower",
+  slice = list(acceleration = m.acc, displacement = m.dp)
+)
+plot(
+  svm.lin,
+  Auto02,
+  mpg ~ weight,
+  main = "Linear: mpg~weight",
+  slice = list(acceleration = m.acc, displacement = m.dp)
+)
+plot(
+  svm.lin,
+  Auto02,
+  mpg ~ cylinders,
+  main = "Linear: mpg~cylinders",
+  slice = list(displacement = m.dp, horsepower = m.hp)
+)
+plot(
+  svm.lin,
+  Auto02,
+  mpg ~ origin,
+  main = "Linear: mpg~origin",
+  slice = list(displacement = m.dp, horsepower = m.hp)
+)
+plot(
+  svm.lin,
+  Auto02,
+  mpg ~ year,
+  main = "Linear: mpg~year",
+  slice = list(displacement = m.dp, horsepower = m.hp)
+)
+# Radial plots
+plot(
+  svm.rad,
+  Auto02,
+  mpg ~ acceleration,
+  main = "Radial: mpg~acceleration",
+  slice = list(displacement = m.dp, horsepower = m.hp)
+)
+plot(
+  svm.rad,
+  Auto02,
+  mpg ~ displacement,
+  main = "Radial: mpg~displacement",
+  slice = list(acceleration = m.acc, horsepower = m.hp)
+)
+plot(
+  svm.rad,
+  Auto02,
+  mpg ~ horsepower,
+  main = "Radial: mpg~horsepower",
+  slice = list(acceleration = m.acc, displacement = m.dp)
+)
+plot(
+  svm.rad,
+  Auto02,
+  mpg ~ weight,
+  main = "Radial: mpg~weight",
+  slice = list(acceleration = m.acc, displacement = m.dp)
+)
+plot(
+  svm.rad,
+  Auto02,
+  mpg ~ cylinders,
+  main = "Linear: mpg~cylinders",
+  slice = list(displacement = m.dp, horsepower = m.hp)
+)
+plot(
+  svm.rad,
+  Auto02,
+  mpg ~ origin,
+  main = "Linear: mpg~origin",
+  slice = list(displacement = m.dp, horsepower = m.hp)
+)
+plot(
+  svm.rad,
+  Auto02,
+  mpg ~ year,
+  main = "Linear: mpg~year",
+  slice = list(displacement = m.dp, horsepower = m.hp)
+)
+# Polynomial
+plot(
+  svm.poly,
+  Auto02,
+  mpg ~ acceleration,
+  main = "Polynomial: mpg~acceleration",
+  slice = list(displacement = m.dp, horsepower = m.hp)
+)
+plot(
+  svm.poly,
+  Auto02,
+  mpg ~ displacement,
+  main = "Polynomial: mpg~displacement",
+  slice = list(acceleration = m.acc, horsepower = m.hp)
+)
+plot(
+  svm.poly,
+  Auto02,
+  mpg ~ horsepower,
+  main = "Polynomial: mpg~horsepower",
+  slice = list(acceleration = m.acc, displacement = m.dp)
+)
+plot(
+  svm.poly,
+  Auto02,
+  mpg ~ weight,
+  main = "Polynomial: mpg~weight",
+  slice = list(acceleration = m.acc, displacement = m.dp)
+)
+plot(
+  svm.poly,
+  Auto02,
+  mpg ~ cylinders,
+  main = "Linear: mpg~cylinders",
+  slice = list(displacement = m.dp, horsepower = m.hp)
+)
+plot(
+  svm.poly,
+  Auto02,
+  mpg ~ origin,
+  main = "Linear: mpg~origin",
+  slice = list(displacement = m.dp, horsepower = m.hp)
+)
+plot(
+  svm.poly,
+  Auto02,
+  mpg ~ year,
+  main = "Linear: mpg~year",
+  slice = list(displacement = m.dp, horsepower = m.hp)
+)
+```
+
+```{r}
+```
+## Q.8
+
+```{r, message=FALSE}
+library(ISLR)
+data("OJ")
+
+oj = OJ
+```
+```{r, message=FALSE, include=FALSE}
+attach(oj)
+```
+
+#### (a) Create a training set containing a random sample of 800 observations, and a test set containing the remaining observations.
+```{r}
+inTrain = sample(1070,800)
+train = oj[inTrain,]
+test = oj[-inTrain,]
+```
+#### (b) Fit a support vector classifier to the training data using cost=0.01, with Purchase as the response and the other variables as predictors. Use the summary() function to produce summary statistics, and describe the results obtained.
+```{r}
+svm.lin2 = svm(Purchase ~ ., kernel = "linear", data = train, cost = 0.01)
+summary(svm.lin2)
+```
+
+#### (c) What are the training and test error rates?
+```{r}
+test.pred1=predict(svm.lin2, test)
+train.pred1=predict(svm.lin2, train)
+
+TrainErr = mean(train.pred1 != train$Purchase)
+TrainErr
+TestErr = mean(test.pred1 != test$Purchase)
+TestErr
+```
+
+#### (d) Use the tune() function to select an optimal cost. Consider values in the range 0.01 to 10.
+```{r}
+set.seed(1)
+tune.lin2 = tune(svm, Purchase~., data=train, kernel ="linear", ranges =list(cost=seq(0.01, 10, 0.333)))
+
+op = tune.lin2$best.parameters$cost
+op
+```
+
+#### (e) Compute the training and test error rates using this new value for cost.
+```{r}
+svm.lin4 = svm(Purchase ~ ., kernel = "linear", data = train, cost = op)
+
+test.pred2=predict(svm.lin4, test)
+train.pred2=predict(svm.lin4, train)
+
+TrainErr = mean(train.pred2 != train$Purchase)
+TrainErr
+TestErr = mean(test.pred2 != test$Purchase)
+TestErr
+```
+
+#### (f) Repeat parts (b) through (e) using a support vector machine with a radial kernel. Use the default value for gamma.
+```{r}
+svm.rad2 = svm(Purchase ~ ., kernel = "radial", data = train, cost = 0.01)
+
+test.pred3=predict(svm.rad2, test)
+train.pred3=predict(svm.rad2, train)
+
+TestErr = mean(train.pred3 != train$Purchase)
+TestErr
+TrainErr = mean(test.pred3 != test$Purchase)
+TrainErr
+Accuracy = 1 - TrainErr
+Accuracy
+```
+```{r}
+tune.lin3 = tune(svm, Purchase~., data=train, kernel ="linear", ranges =list(cost=seq(0.01, 10, 0.333)))
+
+op = tune.lin3$best.parameters$cost
+
+svm.lin5 = svm(Purchase ~ ., kernel = "radial", data = train, cost = op)
+
+train.pred4=predict(svm.lin5, train)
+test.pred4=predict(svm.lin5, test)
+
+TestErr = mean(test.pred4 != test$Purchase)
+TestErr
+TrainErr = mean(train.pred4 != train$Purchase)
+TrainErr
+```
+#### (g) Repeat parts (b) through (e) using a support vector machine with a polynomial kernel. Set degree=2.
+```{r}
+svm.poly2 = svm(Purchase ~ ., kernel = "polynomial", data = train, cost = 0.01, degree=2)
+
+train.pred5=predict(svm.poly2, train)
+test.pred5=predict(svm.poly2, test)
+
+TestErr = mean(test.pred5 != test$Purchase)
+TestErr
+TrainErr = mean(train.pred5 != train$Purchase)
+TrainErr
+```
+```{r}
+tune.lin4 = tune(svm, Purchase~., data=train, kernel ="polynomial", ranges =list(cost=seq(0.01, 10, 0.333)), degree=2)
+
+op = tune.lin4$best.parameters$cost
+
+svm.lin6 = svm(Purchase ~ ., kernel = "polynomial", data = train, cost = op, degree=2)
+
+train.pred6=predict(svm.lin6, train)
+test.pred6=predict(svm.lin6, test)
+
+TestErr = mean(train.pred6 != train$Purchase)
+TestErr
+TrainErr = mean(test.pred6 != test$Purchase)
+TrainErr
+Accuracy = 1 - TrainErr
+Accuracy
+```
+#### (h) Overall, which approach seems to give the best results on this data?
+```{r}
+# Radial Model
+TestErr = mean(test.pred4 != test$Purchase)
+TestErr
+TrainErr = mean(train.pred4 != train$Purchase)
+TrainErr
+```
+
+The support vector model with radial kernel gives the best results because it has the lowest number of errors and a high accuracy.

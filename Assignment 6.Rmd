@@ -1,0 +1,227 @@
+---
+title: "Assignment 6"
+author: "Sumaiya Shefa"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    toc_depth: 2
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Q.6
+```{r, include=FALSE}
+library(ISLR)
+data("Wage")
+head(Wage)
+```
+
+### (a) Perform polynomial regression to predict wage using age. Use cross-validation to select the optimal degree d for the polynomial. What degree was chosen, and how does this compare to the results of hypothesis testing using ANOVA? Make a plot of the resulting polynomial fit to the data.
+```{r, warning=FALSE, message=FALSE, echo=FALSE, include=FALSE}
+library(GGally)
+ggally_autopoint(data=Wage, mapping = aes(x=age,y=wage), size=2, col="purple" )
+```
+```{r}
+```
+
+#### Split Data
+```{r, message=FALSE}
+library(glmnet)
+library(Matrix)
+library(caret)
+
+inTrain1 = createDataPartition(y=Wage$wage,  p=0.75,list = FALSE)
+train1 = Wage[inTrain1,]
+test1 = Wage[-inTrain1,]
+```
+#### Optimal Degree d 
+```{r}
+# train and test 
+x.train = model.matrix(wage ~ ., data=train1)
+x.test = model.matrix(wage ~ ., data=test1)
+
+y.train= train1$wage
+y.test = Wage$wage
+
+# choose degree using cross-validation
+cv.d=cv.glmnet(x.train,y.train,alpha=0)
+d=round(cv.d$lambda.min, 0)
+d
+```
+
+#### Polynomial Function
+```{r, message=FALSE}
+# polynomial regression to the 4th degree
+poly.fit = glm(wage ~ poly(age, 4), data = Wage)
+
+# create  grid of values for age to predict wage
+agelims = range(Wage$age)
+age.grid = seq(from = agelims[1], to = agelims[2])
+
+# predict wage using age
+poly.preds = predict(poly.fit, newdata = list(age = age.grid), se = TRUE)
+
+poly.se.bands = cbind(poly.preds$se.fit + 2 * poly.preds$se.fit, poly.preds$poly.fit - 2 * poly.preds$se.fit)
+
+summary(poly.fit)
+```
+
+#### ANOVA Model of the Polynomial Function
+```{r}
+# linear model
+fit.1=lm(wage~age,data=Wage)
+#polynomial models
+fit.2=lm(wage~poly(age,2),data=Wage) 
+fit.3=lm(wage~poly(age,3),data=Wage)
+fit.4=lm(wage~poly(age,4),data=Wage)
+fit.5=lm(wage~poly(age,5),data=Wage)
+
+anova(fit.1,fit.2,fit.3,fit.4,fit.5)
+```
+The p-value is increasing and F statistic is decreasing as the degree of the polynomial is increasing. The model with the 5th degree polynomial has a F statistic that's less than 1 and a p-value that is bigger 0.05. So the degree of the polynomial model for the Wage data needs to be less than 5.
+
+```{r, include=FALSE}
+attach(Wage)
+```
+
+#### Plot of the Polynomial Function
+```{r}
+par(mfrow=c(1,1),mar=c(4.5,4.5,1,1),oma=c(0,0,2,0))
+plot(age,wage,xlim=agelims,cex =.5,col="darkgrey")
+title("Degree-4 Polynomial",outer=T)
+lines(age.grid,poly.preds$fit,lwd=2,col="darkblue")
+matlines(age.grid,poly.se.bands,lwd=1,col="lightblue",lty=3)
+```
+### (b) Fit a step function to predict wage using age, and perform crossvalidation to choose the optimal number of cuts. Make a plot of the fit obtained.
+
+#### Cross Validation
+```{r, message=FALSE}
+library(base)
+library(ModelMetrics)
+library(boot)
+library(lava)
+
+# cross-validation
+cv <- rep(NA, 10)
+for (i in 2:10) {
+    Wage$age.cut <- cut(Wage$age, i)
+    fit <- glm(wage ~ age.cut, data = Wage)
+    cv[i] <- cv.glm(Wage, fit, K = 10)$delta[1]
+}
+which.min(cv)
+```
+```{r}
+cv.df = as.data.frame(cbind(cv=cv[2:10], xaxis=(2:10)))
+ggplot(cv.df, aes(xaxis, cv))+geom_line(color = "navy")+geom_point(size=2)+geom_point(cv.df[7,], mapping=aes(xaxis, cv),size=2, color = "red")+ xlab("Cut Points")
+```
+
+#### Step Function
+```{r}
+# Fit a step function
+step.fit=lm(wage~cut(age, 8),data=Wage)
+coef(summary(step.fit))
+
+# predict the step function
+step.preds=predict(step.fit,newdata=list(age=age.grid),se=TRUE)
+
+step.se.bands = cbind(step.preds$step.fit + 2 * step.preds$se.fit, step.preds$fit - 2 * step.preds$se.fit)
+```
+#### Plot of the Step Function
+```{r}
+par(mfrow=c(1,1),mar=c(4.5,4.5,1,1),oma=c(0,0,2,0))
+plot(age,wage,xlim=agelims,cex =.5,col="darkgrey")
+title("Step Function",outer=T)
+lines(age.grid,step.preds$fit,lwd=2,col="darkblue")
+matlines(age.grid,step.se.bands,lwd=1,col="lightblue",lty=3)
+```
+
+```{r}
+detach(Wage)
+```
+
+## Q.10
+```{r, echo=FALSE, include=FALSE}
+# rm(cv.d, glm.fit, inTrain1, test1, train1, Wage, x.test, x.train, cv, d, i, y.test, y.train, fit)
+```
+
+```{r, include=FALSE}
+library(ISLR)
+data("College")
+head(College)
+```
+```{r}
+attach(College) 
+```
+
+### (a) Split the data into a training set and a test set. Using out-of-state tuition as the response and the other variables as the predictors, perform forward stepwise selection on the training set in order to identify a satisfactory model that uses just a subset of the predictors.
+
+
+#### Split Data
+```{r}
+# Split the data into a training set and a test set
+inTrain2 = createDataPartition(y = College$Outstate, list = FALSE, p=0.75)
+train2 = College[inTrain2,]
+test2= College[-inTrain2,]
+```
+#### Forward Stepwise Selection
+```{r}
+library(leaps)
+
+# forward stepwise selection on the training set
+stepwise.fwd=regsubsets(Outstate~., data= train2, nvmax = 17,  method ="forward")
+fwd.summary = summary(stepwise.fwd)
+fwd.summary
+```
+#### Plots
+```{r}
+rsq.df = as.data.frame(cbind(xaxis=(1:17), rsq=fwd.summary$rsq))
+cp.df = as.data.frame(cbind(xaxis=(1:17), cp=fwd.summary$cp))
+bic.df = as.data.frame(cbind(xaxis=(1:17), bic=fwd.summary$bic))
+adjrsq.df = as.data.frame(cbind(xaxis=(1:17), adjrsq=fwd.summary$adjr2))
+
+ggplot()+ 
+  geom_line(rsq.df, mapping=aes(xaxis, rsq),color = "navy") + 
+  geom_point(rsq.df, mapping=aes(xaxis, rsq),color = "navy", size=2) + geom_boxplot()
+
+ggplot() + 
+  geom_line(cp.df, mapping=aes(xaxis, cp),color = "black") + 
+  geom_point(cp.df, mapping=aes(xaxis, cp),color = "black", size=2) 
+
+ggplot() + 
+  geom_line(bic.df, mapping=aes(xaxis, bic),color = "maroon") + 
+  geom_point(bic.df, mapping=aes(xaxis, bic),color = "maroon", size=2)
+
+ggplot() + 
+  geom_line(adjrsq.df, mapping=aes(xaxis, adjrsq),color = "darkred") + 
+  geom_point(adjrsq.df, mapping=aes(xaxis, adjrsq),color = "darkred", size=2)
+```
+
+### (b) Fit a GAM on the training data, using out-of-state tuition as the response and the features selected in the previous step as the predictors. Plot the results, and explain your findings.
+```{r, message=FALSE}
+library(gam)
+
+gam.clg = gam(
+  Outstate ~ Private + Private + s(Apps, 4) + s(Accept, 5) +  s(F.Undergrad, 5) + s(P.Undergrad, 4) + s(Room.Board, 5), data = train2)
+
+summary.Gam(gam.clg)
+```
+#### Plots
+```{r}
+plot.Gam(gam.clg, col ="blue", se=TRUE)
+```
+
+### (c) Evaluate the model obtained on the test set, and explain the results obtained.
+```{r}
+preds = predict(gam.clg, test2)
+RSS = sum((test2$Outstate - preds)^2) 
+TSS = sum((test2$Outstate - mean(test2$Outstate))^2)
+1 - (RSS / TSS)
+```
+### (d) For which variables, if any, is there evidence of a non-linear relationship with the response?
+```{r}
+summary.Gam(gam.clg)
+```
+The model suggests a strong non-linear relationship between "Outstate" and "Expend", and a moderate non-linear relationship between "Outstate" and "Grad.rate"
