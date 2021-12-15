@@ -1,0 +1,177 @@
+---
+title: "Assignment 2"
+subtitle: Sumaiya Shefa
+output:
+  html_document: default
+---
+
+## Q.2
+KNN Classifier is used for classification problems with a qualitative response. KNN regression is used for solving regression problems with a quantitative response. KNN Classifier classifies a given observation to the class with the largest estimated probability. KNN regression identifies the neighborhood of the observations and then estimates the outcome as the average of all the training responses in the neighborhood.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(readr)
+library(MASS)
+library(ISLR)
+```
+
+## Q.9
+
+```{r}
+Auto = read.csv("Auto.csv", na.strings = "?")
+Auto = na.omit(Auto)
+```
+
+```{r}
+# scatterplot matrix
+plot(Auto)
+```
+```{r}
+# matrix of correlations
+corr = cor(Auto[1:8])
+print(corr)
+```
+```{r, message=FALSE}
+attach(Auto)
+```
+
+```{r}
+# multiple linear regression
+lm.fit = lm(mpg~.-name, data = Auto)
+summary(lm.fit)
+```
+#### Relationship between the predictors and the response
+There is a relationship between the predictors and the response based on the linear regression model. The model has a R-square of 0.8215.
+
+#### Predictors that appear to have a statistically significant relationship to the response
+The predictors displacement, weight, year, and origin appear to have a statistically significant relationship with the response variable mpg. These predictors have a p-value less than 0.05 which makes them statistically significant.
+
+#### Coefficient for the year variable
+The year variable suggests that each year mpg which is the response variable increases by 0.75. 
+
+```{r}
+# diagnostic plots
+par(mfrow=c(2,2))
+plot(lm.fit)
+```
+```{r}
+```
+
+#### Do the residual plots suggest any unusually large outliers? Does the leverage plot identify any observations with unusually high leverage?
+The residual plot has some unusually large outliers which also have high leverage in the leverage plot. So those outliers are influential in the model.
+
+```{r}
+# interaction effects
+inter_eff = lm(mpg ~ . - name + weight * year + weight * origin ,
+               data = Auto)
+summary(inter_eff)
+```
+${weight}\times{year}$ and $weight\times origin$ becomes significant with a p-value less than 0.05.R-square also increases with 0.8495.
+```{r}
+# transformation of variables
+trans_var = lm(mpg ~ . - name + I(log(weight)) +                 I(log(origin)) + I(log(weight * year)), data = Auto)
+summary(trans_var)
+```
+```{r}
+trans_var2 = lm(mpg ~ . - name + I(sqrt(weight)) +
+                  I(sqrt(origin)) + I(sqrt(weight * year)), data = Auto)
+summary(trans_var2)
+```
+```{r}
+trans_var3 = lm(mpg ~ . - name + I(weight ^ 2) + I(origin ^ 2) + I((weight *year) ^ 2), data = Auto)
+summary(trans_var3)
+```
+Transformation using log has the best outputs with highest R-square = 0.8706, highest F-statistic=256.4, and lowest residual error=2.844. So the models using log transformation is better than the original regression model and the two models that use square root and square transformations.
+
+```{r}
+detach(Auto)
+```
+
+## Q.10
+
+```{r, message=FALSE}
+data(Carseats)
+attach(Carseats)
+
+```
+```{r}
+contrasts(Urban)
+contrasts(US)
+```
+The contrasts show that if stores are in the Urban are it's a 1 and 0 otherwise and stores in the US is a 1 otherwise 0.
+
+#### Multiple regression model
+
+```{r}
+# Model 1:
+lm.fit2 = lm(Sales ~ Price + Urban + US)
+summary(lm.fit2)
+```
+#### Interpretation of coefficients
+Price of child carseats decreases sales, stores in Urban area (UrbanYes) decreases, and stores in US(USYes) increases the sales.
+This means that stores in an Urban area of US has low sales where price is a significant factor.
+
+#### Model in equation form
+
+$Sales = -0.054Price -0.022UrbanYes + 1.201USYes$
+
+#### Rejecting the null hypothesis
+The F-statistic = 41.52 is very low and not all the variables are significant because P-value is not less than 0.05. So we cannot reject the null hypothesis.
+
+#### Predictors with evidence of association with the outcome
+Only Price and USYes variables are significant with a p-value of 0.05. UrbanYes is not significant because of it's high p-value. So we can fit a smaller model for the outcome by removing the UrbanYes variable.
+
+```{r}
+# fit a smaller model
+# Model 2:
+lm.fit3 = lm(Sales ~ Price + US)
+summary(lm.fit3)
+```
+
+#### Fit of two models
+Although Model 2 only has significant predictors, both Model 1 and Model 2 have a low F-Statistics, high residual standard errors, and low R-square value. These indicates that neither of the models are a good fit for the data.
+
+#### 95% confidence intervals for the coefficient(s) of Model 2
+
+```{r}
+confid_int=confint(lm.fit3, level = 0.95)
+```
+#### Outliers or high leverage observations in Model 2
+```{r}
+par(mfrow=c(2,2))
+plot(lm.fit3)
+```
+```{r}
+
+```
+There are very few outliers and high leverage observations in the model so they are not very influential. 
+
+```{r}
+detach(Carseats)
+```
+
+## Q.12
+
+### Simple linear regression without an intercept
+
+#### Circumstances where coefficient estimate for the regression of X onto Y the same as the coefficient estimate for the regression of Y onto X
+If the predictors X and Y are equal then coefficient estimate for the regression of X onto Y the same as the coefficient estimate for the regression of Y onto X.
+
+#### Example where coefficient estimate for the regression of X onto Y is different from the coefficient estimate for the regression of Y onto X
+```{r}
+X= rnorm(n=100)
+Y= 0.25*X + X
+coef(lm(Y~X))
+coef(lm(X~Y))
+```
+
+
+#### Example where the coefficient estimate for the regression of X onto Y is the same as the coefficient estimate for the regression of Y onto X
+```{r}
+X= rnorm(n=100)
+Y= X
+coef(lm(Y~X))
+coef(lm(X~Y))
+```
